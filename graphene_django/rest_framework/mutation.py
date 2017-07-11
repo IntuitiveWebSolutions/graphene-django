@@ -14,16 +14,12 @@ from graphene.types.options import Options
 from graphene.types.utils import get_field_as
 from graphene.utils.is_base_type import is_base_type
 
+from ..registry import get_global_registry
 from .serializer_converter import (
     convert_serializer_to_input_type,
     convert_serializer_field
 )
 from .types import ErrorType
-
-
-class SerializerMutationOptions(Options):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, serializer_class=None, **kwargs)
 
 
 class SerializerMutationMeta(MutationMeta):
@@ -127,3 +123,73 @@ class SerializerMutation(six.with_metaclass(SerializerMutationMeta, Mutation)):
         obj = serializer.save()
 
         return cls(errors=[], **obj)
+
+
+class ModelSerializerMutationMeta(MutationMeta):
+    def __new__(cls, name, bases, attrs):
+        if not is_base_type(bases, ModelSerializerMutationMeta):
+            return type.__new__(cls, name, bases, attrs)
+
+        options = Options(
+            attrs.pop('Meta', None),
+            name=name,
+            description=attrs.pop('__doc__', None),
+            serializer_class=None,
+            interfaces=(),
+            registry=None
+        )
+
+        if not options.serializer_class:
+            raise Exception('Missing serializer_class')
+
+        cls = ObjectTypeMeta.__new__(
+            cls, name, bases, dict(attrs, _meta=options)
+        )
+
+        meta_model = options.serializer_class.Meta.model
+        registry = get_global_registry()
+        model_type = registry.get_type_for_model(meta_model)
+        options.fields = {'errors': get_field_as(cls.errors, Field)}
+        options.fields[meta_model._meta.model_name] = graphene.Field(model_type)
+
+        cls.Input = convert_serializer_to_input_type(options.serializer_class)
+
+        cls.Field = partial(
+            Field,
+            cls,
+            resolver=cls.mutate,
+            input=Argument(cls.Input, required=True)
+        )
+
+        return cls
+
+
+class ModelSerializerMutation(six.with_metaclass(ModelSerializerMutationMeta, Mutation)):
+    errors = graphene.List(
+        ErrorType,
+        description='May contain more than one error for same field.'
+    )
+
+    @classmethod
+    def mutate(cls, instance, args, request, info):
+        input = args.get('input')
+
+        serializer = cls._meta.serializer_class(data=dict(input))
+
+        if serializer.is_valid():
+            return cls.perform_mutate(serializer, info)
+        else:
+            errors = [
+                ErrorType(field=key, messages=value)
+                for key, value in serializer.errors.items()
+            ]
+
+            return cls(errors=errors)
+
+    @classmethod
+    def perform_mutate(cls, serializer, info):
+        obj = serializer.save()
+
+        _model_as_kwarg = {}
+        _model_as_kwarg[obj._meta.model_name] = obj
+        return cls(errors=[], **_model_as_kwarg)
