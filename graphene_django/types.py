@@ -2,6 +2,7 @@ from collections import OrderedDict
 
 import six
 
+from django.db.models import ForeignKey
 from django.utils.functional import SimpleLazyObject
 from graphene import Field, ObjectType
 from graphene.types.objecttype import ObjectTypeMeta
@@ -9,7 +10,7 @@ from graphene.types.options import Options
 from graphene.types.utils import merge, yank_fields_from_attrs
 from graphene.utils.is_base_type import is_base_type
 
-from .converter import convert_django_field_with_choices
+from .converter import convert_django_field_with_choices, convert_field_to_id
 from .registry import Registry, get_global_registry
 from .utils import (DJANGO_FILTER_INSTALLED, get_model_fields,
                     is_valid_django_model)
@@ -35,6 +36,15 @@ def construct_fields(options):
         converted = convert_django_field_with_choices(field, options.registry)
         fields[name] = converted
 
+        attname = getattr(field, 'attname', '')
+        add_foreignkey_attname = all([
+            isinstance(field, ForeignKey),
+            options.include_foreignkey_ids,
+            attname not in fields,
+        ])
+        if add_foreignkey_attname:
+            fields[field.attname] = convert_field_to_id(field)
+
     return fields
 
 
@@ -55,6 +65,7 @@ class DjangoObjectTypeMeta(ObjectTypeMeta):
             only_fields=(),
             exclude_fields=(),
             interfaces=(),
+            include_foreignkey_ids=False,
             skip_registry=False,
             registry=None
         )
