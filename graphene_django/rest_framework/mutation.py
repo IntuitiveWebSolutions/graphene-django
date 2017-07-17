@@ -135,6 +135,7 @@ class ModelSerializerMutationMeta(MutationMeta):
             name=name,
             description=attrs.pop('__doc__', None),
             serializer_class=None,
+            return_field_name=None,
             interfaces=(),
             registry=None
         )
@@ -150,7 +151,9 @@ class ModelSerializerMutationMeta(MutationMeta):
         registry = get_global_registry()
         model_type = registry.get_type_for_model(meta_model)
         options.fields = {'errors': get_field_as(cls.errors, Field)}
-        options.fields[meta_model._meta.model_name] = graphene.Field(model_type)
+
+        cls.return_field_name = options.return_field_name or meta_model._meta.model_name
+        options.fields[cls.return_field_name] = graphene.Field(model_type)
 
         cls.Input = convert_serializer_to_input_type(options.serializer_class)
 
@@ -191,5 +194,5 @@ class ModelSerializerMutation(six.with_metaclass(ModelSerializerMutationMeta, Mu
         obj = serializer.save()
 
         _model_as_kwarg = {}
-        _model_as_kwarg[obj._meta.model_name] = obj
+        _model_as_kwarg[cls.return_field_name] = obj
         return cls(errors=[], **_model_as_kwarg)
