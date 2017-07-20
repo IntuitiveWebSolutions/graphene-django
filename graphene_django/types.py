@@ -10,12 +10,8 @@ from graphene.types.options import Options
 from graphene.types.utils import merge, yank_fields_from_attrs
 from graphene.utils.is_base_type import is_base_type
 
-<<<<<<< HEAD
 from .converter import convert_django_field_with_choices, convert_field_to_id
-=======
-from .converter import convert_django_field_with_choices
 from .optimization import optimize_queryset
->>>>>>> 2d2c5ee... Adding query optimization
 from .registry import Registry, get_global_registry
 from .utils import (DJANGO_FILTER_INSTALLED, get_model_fields,
                     is_valid_django_model)
