@@ -52,7 +52,10 @@ def get_related_fetches_for_model(model, graphql_ast):
         try:
             related_model = get_related_model(selection_field)
         except:
-            # This is not a ForeignKey or Relation, check manual optimizations
+            related_model = None
+
+        # This is not a ForeignKey or Relation, check manual optimizations
+        if not related_model:
             manual_optimizations = optimizations.get(selection_name)
             if manual_optimizations:
                 for manual_select in manual_optimizations.get(SELECT, []):
