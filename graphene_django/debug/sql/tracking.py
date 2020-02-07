@@ -4,8 +4,8 @@ from __future__ import absolute_import, unicode_literals
 import json
 from threading import local
 from time import time
+import six
 
-from django.utils import six
 from django.utils.encoding import force_text
 
 from .types import DjangoDebugSQL
